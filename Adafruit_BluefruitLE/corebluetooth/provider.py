@@ -172,7 +172,15 @@ class CentralDelegate(object):
 
     def peripheral_didUpdateNotificationStateForCharacteristic_error_(self, peripheral, characteristic, error):
         # Characteristic notification state updated.  Ignored for now.
-        logger.debug('peripheral_didUpdateNotificationStateForCharacteristic_error called')
+        logger.debug('peripheral_didUpdateNotificationStateForCharacteristic_error called (%s) isNotifying: %d'
+                     % (characteristic.UUID(), characteristic.isNotifying()))
+        # Stop if there was some kind of error.
+        if error is not None:
+            return
+        # Notify the device about the updated characteristic value.
+        device = device_list().get(peripheral)
+        if device is not None:
+            device._characteristic_notify_state_changed(characteristic)
 
     def peripheral_didUpdateValueForCharacteristic_error_(self, peripheral, characteristic, error):
         """Called when characteristic value was read or updated."""
@@ -287,7 +295,9 @@ class CoreBluetoothProvider(Provider):
         """
         # Rethrow exception with its original stack trace following advice from:
         # http://nedbatchelder.com/blog/200711/rethrowing_exceptions_in_python.html
-        raise exec_info[1], None, exec_info[2]
+        e = exec_info[1]
+        e.__traceback__ = exec_info[2]
+        raise e
 
     def list_adapters(self):
         """Return a list of BLE adapter objects connected to the system."""

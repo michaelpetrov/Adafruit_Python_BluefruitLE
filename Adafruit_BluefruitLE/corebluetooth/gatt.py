@@ -67,6 +67,7 @@ class CoreBluetoothGattCharacteristic(GattCharacteristic):
         CoreBluetooth CBCharacteristic instance.
         """
         self._characteristic = characteristic
+        self._is_notifying = False
         self._value_read = threading.Event()
 
     @property
@@ -93,6 +94,8 @@ class CoreBluetoothGattCharacteristic(GattCharacteristic):
 
     def write_value(self, value, write_type=0):
         """Write the specified value to this characteristic."""
+        if isinstance(value, str):
+            value = bytes(value, encoding='utf8')
         data = NSData.dataWithBytes_length_(value, len(value))
         self._device._peripheral.writeValue_forCharacteristic_type_(data,
             self._characteristic,
@@ -104,11 +107,22 @@ class CoreBluetoothGattCharacteristic(GattCharacteristic):
         one parameter which is the value (as a string of bytes) of the changed
         characteristic value.
         """
+        cv = threading.Condition()
+        def on_notify_state_change(isNotifying):
+            cv.acquire()
+            self._is_notifying = isNotifying
+            cv.notify_all()
+            cv.release()
+
         # Tell the device what callback to use for changes to this characteristic.
-        self._device._notify_characteristic(self._characteristic, on_change)
+        self._device._notify_characteristic(self._characteristic, on_notify_state_change, on_change)
         # Turn on notifications of characteristic changes.
         self._device._peripheral.setNotifyValue_forCharacteristic_(True,
             self._characteristic)
+        cv.acquire()
+        while not self._is_notifying:
+            cv.wait()
+        cv.release()
 
     def stop_notify(self):
         """Disable notification of changes for this characteristic."""

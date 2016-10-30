@@ -105,20 +105,24 @@ class Provider(object):
         list of found devices (which might be empty).
         """
         # Convert service UUID list to counter for quicker comparison.
-        expected = Counter(service_uuids)
+        # print("expected: %s" % service_uuids)
+        expected = set(service_uuids)
         # Grab all the devices.
         devices = self.list_devices()
+        # print("devices: %s" % devices)
         # Filter to just the devices that have the requested service UUID/name.
         found = []
         for device in devices:
+            # print("device: %s (%s)" % (device.name, device.id))
             if name is not None:
                 if device.name == name:
                     # Check if the name matches and add the device.
                     found.append(device)
             else:
                 # Check if the advertised UUIDs have at least the expected UUIDs.
-                actual = Counter(device.advertised)
-                if actual >= expected:
+                actual = set(device.advertised)
+                # print("advertised: %s" % actual)
+                if len(expected.intersection(actual)) > 0:
                     found.append(device)
         return found
 

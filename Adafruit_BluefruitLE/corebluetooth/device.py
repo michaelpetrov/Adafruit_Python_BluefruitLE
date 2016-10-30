@@ -41,6 +41,7 @@ class CoreBluetoothDevice(Device):
         self._peripheral = peripheral
         self._advertised = []
         self._discovered_services = set()
+        self._char_on_notify_state_changed = {}
         self._char_on_changed = {}
         self._rssi = None
         # Events to signify when an asyncronous request has finished.
@@ -107,13 +108,21 @@ class CoreBluetoothDevice(Device):
             # service discovery complete event.
             self._discovered.set()
 
-    def _notify_characteristic(self, characteristic, on_change):
+    def _notify_characteristic(self, characteristic, on_notify_state_change, on_change):
         """Call the specified on_change callback when this characteristic
         changes.
         """
         # Associate the specified on_changed callback with any changes to this
         # characteristic.
+        self._char_on_notify_state_changed[characteristic] = on_notify_state_change
         self._char_on_changed[characteristic] = on_change
+
+    def _characteristic_notify_state_changed(self, characteristic):
+        """Called when the specified characteristic has changed its state (notifying or not)"""
+        isNotifying = characteristic.isNotifying()
+        on_notify_state_changed = self._char_on_notify_state_changed.get(characteristic, None)
+        if on_notify_state_changed is not None:
+            on_notify_state_changed(isNotifying)
 
     def _characteristic_changed(self, characteristic):
         """Called when the specified characteristic has changed its value."""
